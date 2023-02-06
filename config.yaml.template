@@ -1,0 +1,13 @@
+azure:
+  user: [USER]
+  tenant: [TENANT]
+cosmos:
+  url: [URL]
+  scope: [SCOPE]
+redis:
+  url: [URL]
+  scope: [SCOPE]
+options:
+  fetch_from_azure_ad: true
+#  organizationId: [ORGANIZATION_ID]
+
