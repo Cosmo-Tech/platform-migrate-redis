@@ -9,17 +9,12 @@
 
 ### Constraints:
 * This script works since API v2.
+* If object already exists in Redis, it will be updated.
 
 ### Installation
-## Log in with az cli
-[Install Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/install-debian?view=powershell-7.2)
-[Install Powershell AZ module](https://learn.microsoft.com/en-us/powershell/azure/install-az-ps?view=azps-8.3.0)
+Login with az cli
 ``` powershell
-Install-Module -Name Az -Scope CurrentUser -Repository PSGallery -Force
-```
-Connect in powershell
-``` powershell
-Connect-AzAccount
+az login
 ```
 
 ## Run
@@ -29,5 +24,3 @@ pipenv shell
 pipenv install
 python main.py
 ```
-
-## Report example format

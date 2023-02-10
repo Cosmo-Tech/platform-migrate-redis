@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-cosmotech-api = "==2.0.0"
+cosmotech-api = ">=2.0.0"
 pyyaml = "*"
 azure-identity = "*"
 azure-graphrbac = "*"
