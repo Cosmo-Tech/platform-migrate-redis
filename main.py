@@ -1,10 +1,10 @@
 # Copyright (c) Cosmo Tech.
 # Licensed under the MIT license.l
+import getpass
 import logging
 import sys
 from dataclasses import dataclass
 from datetime import datetime
-from getpass import getpass
 
 import cosmotech_api
 import yaml
