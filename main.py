@@ -14,11 +14,11 @@ from azure.identity import DefaultAzureCredential
 from cosmotech_api import ApiClient
 from cosmotech_api import Configuration
 from cosmotech_api.api import connector_api
+from cosmotech_api.api import solution_api
 from cosmotech_api.api import dataset_api
 from cosmotech_api.api import organization_api
 from cosmotech_api.api import scenario_api
 from cosmotech_api.api import scenariorun_api
-from cosmotech_api.api import solution_api
 from cosmotech_api.api import workspace_api
 
 logger = logging.getLogger()
@@ -112,7 +112,7 @@ def migrate_organizations(config, ctx):
             ctx.organizationId = organization.id
             logger.info("Migrated organization " + f"{organization.id}")
             migrate_solutions(config, ctx)
-            migrate_datasets(config, ctx)
+            # migrate_datasets(config, ctx)
             migrate_workspaces(config, ctx)
     except cosmotech_api.ApiException as e:
         logger.error("Exception when migrating organizations " + f"{e}")
@@ -213,9 +213,8 @@ def migrate_scenarios(config, ctx):
         for scenario in scenarios:
             scenario.organizationId = ctx.organizationId
             scenario.workspaceId = ctx.workspaceId
-
-            scenario.creation_date = int(round(datetime.timestamp(scenario.creation_date) * 1000))
-            scenario.last_update = int(round(datetime.timestamp(scenario.last_update) * 1000))
+            scenario.creation_date = convert_to_millis(scenario["creation_date"])
+            scenario.last_update = convert_to_millis(scenario["last_update"])
             scenario = redis_scenario.import_scenario(
                 ctx.organizationId,
                 ctx.workspaceId,
@@ -257,6 +256,16 @@ def migrate_scenarioruns(config, ctx):
             logger.info("Migrated scenariorun " + f"{scenariorun.id}")
     except cosmotech_api.ApiException as e:
         logger.error("Exception when migrating scenarioruns: " + f"{e}")
+
+
+def convert_to_millis(date_string):
+    dates = date_string.split(".", 1)
+    millis = dates[1][0:6]
+    date_string = dates[0] + "." + millis
+    if not date_string.endswith("Z"):
+        date_string = date_string + "Z"
+    date = datetime.strptime(date_string, '%Y-%m-%dT%H:%M:%S.%fZ')
+    return int(round(datetime.timestamp(date) * 1000))
 
 
 def get_config():
