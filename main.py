@@ -112,7 +112,7 @@ def migrate_organizations(config, ctx):
             ctx.organizationId = organization.id
             logger.info("Migrated organization " + f"{organization.id}")
             migrate_solutions(config, ctx)
-            # migrate_datasets(config, ctx)
+            migrate_datasets(config, ctx)
             migrate_workspaces(config, ctx)
     except cosmotech_api.ApiException as e:
         logger.error("Exception when migrating organizations " + f"{e}")
