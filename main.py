@@ -1,6 +1,5 @@
 # Copyright (c) Cosmo Tech.
 # Licensed under the MIT license.l
-import getpass
 import logging
 import sys
 from dataclasses import dataclass
@@ -8,8 +7,6 @@ from datetime import datetime
 
 import cosmotech_api
 import yaml
-from azure.common.credentials import UserPassCredentials
-from azure.graphrbac import GraphRbacManagementClient
 from azure.identity import DefaultAzureCredential
 from cosmotech_api import ApiClient
 from cosmotech_api import Configuration
@@ -31,24 +28,6 @@ logger.addHandler(streamHandler)
 logger.addHandler(fileHandler)
 logger.setLevel(logging.DEBUG)
 TRACE_DOCUMENTS = False
-
-
-def get_graphclient(config_file):
-    if config_file['options']['fetch_from_azure_ad']:
-        logger.info("logging in for graph API")
-        print()
-        credentials = UserPassCredentials(
-            config_file['azure']['user'],
-            # config_file['azure']['password'],
-            getpass.getpass(prompt='Please enter Azure account password: '),
-            resource="https://graph.windows.net")
-        tenant_id = config_file['azure']['tenant']
-        graphrbac_client = GraphRbacManagementClient(credentials, tenant_id)
-        return graphrbac_client
-    else:
-        logger.info(
-            "Option to fetch users from Azure AD is disabled in config")
-        return None
 
 
 def get_apiclient(config_file):
@@ -273,14 +252,13 @@ def get_config():
         return yaml.safe_load(config_file)
 
 
-def build_config(api_client, graph_client, redis_client, config_file):
+def build_config(api_client, redis_client, config_file):
     mapping = {}
     if 'mapping' not in config_file:
         config_file['mapping'] = {}
     if config_file['mapping'] is not None:
         mapping = config_file['mapping']
     return Config(api_client=api_client,
-                  graph_client=graph_client,
                   redis_client=redis_client,
                   config_file=config_file,
                   mapping=mapping)
@@ -292,8 +270,7 @@ def migrate():
     config_file = get_config()
 
     with get_apiclient(config_file) as api_client, get_redisclient(config_file) as redis_client:
-        graph_client = get_graphclient(config_file)
-        config = build_config(api_client, graph_client, redis_client, config_file)
+        config = build_config(api_client, redis_client, config_file)
         ctx = Context()
         migrate_connectors(config)
         if 'organizationId' in config_file['options']:
@@ -304,7 +281,6 @@ def migrate():
 @dataclass
 class Config(object):
     api_client: str
-    graph_client: str
     redis_client: str
     config_file: str
     mapping: dict
