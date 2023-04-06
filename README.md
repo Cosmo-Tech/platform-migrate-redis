@@ -1,14 +1,12 @@
-## Cosmotech tool to migrate CosmosDB to Redis.
+## Migration Cosmotech Tool from CosmosDB to Redis.
 
 ### Description:
-* Python script need to be connected to Cosmotech API with CosmosDB and Cosmotech API with Redis.
-It migrates all objects in order as shown in the table below.
-* All dates are converted to Unix timestamp.
-* Lost objects aren't migrated (like **ScenarioRun** without **Scenario**)
-* Script provides logs that can be found in **application.log**
+Python script needs to be connected to 2 APIs:
+* Cosmotech API with CosmosDB (since version V2)
+* Cosmotech API with Redis
 
+The script migrates all objects in order as shown in the table below:
 
-### Script workflow:
 | Migration                         | by Organization | by Workspace |
 |-----------------------------------|-----------------|--------------|
 | Azure connection made with az cli |
@@ -20,11 +18,12 @@ It migrates all objects in order as shown in the table below.
 |                                   |                 | Scenarios    
 |                                   |                 | ScenarioRuns  
 
+### During the migration:
+* All dates are converted to Unix timestamp
+* Lost objects aren’t migrated (like ScenarioRun without Scenario)
+* If object already exists in Redis, it will be updated
+* Script provides logs that can be found in application.log file
 
-
-### Constraints:
-* This script works since Cosmotech API v2 (with security constraints)
-* If object already exists in Redis, it will be updated.
 
 ### Installation
 Login with az cli
@@ -34,6 +33,20 @@ az login
 
 ## Run
 Copy and complete [config.yaml.template](config.yaml.template) to config.yaml.
+Provide the URL and scope of the CosmosDB and Redis APIs.
+``` yaml
+# Url and scope of the CosmosDB API to migrate from
+cosmosdb:
+  url: [URL]
+  scope: [SCOPE]
+
+# Url and scope of the Redis API to migrate to
+redis:
+  url: [URL]
+  scope: [SCOPE]
+```
+
+Then run the script
 ``` bash
 pipenv shell
 pipenv install
