@@ -1,13 +1,17 @@
-azure:
-  user: [USER]
-  tenant: [TENANT]
-cosmos:
+# Description: Configuration file for the Cosmotech CosmosDB to Redis migration tool
+# Change the values below to match your environment
+
+# Url and scope of the CosmosDB API to migrate from
+cosmosdb:
   url: [URL]
   scope: [SCOPE]
+
+# Url and scope of the Redis API to migrate to
 redis:
   url: [URL]
   scope: [SCOPE]
+
 options:
-  fetch_from_azure_ad: true
+#  Uncomment the line below and define it if you have to migrate only one organization with id
 #  organizationId: [ORGANIZATION_ID]
 

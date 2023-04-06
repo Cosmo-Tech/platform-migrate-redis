@@ -31,8 +31,8 @@ TRACE_DOCUMENTS = False
 
 
 def get_apiclient(config_file):
-    host = config_file['cosmos']['url']
-    scope = config_file['cosmos']['scope']
+    host = config_file['cosmosdb']['url']
+    scope = config_file['cosmosdb']['scope']
 
     logger.debug("cosmos logging in")
     credential = DefaultAzureCredential()
@@ -265,7 +265,6 @@ def build_config(api_client, redis_client, config_file):
 
 
 def migrate():
-    """Migrate COSMOSDB to REDIS"""
     logging.info("Migration start")
     config_file = get_config()
 
