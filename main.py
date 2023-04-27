@@ -272,8 +272,6 @@ def migrate():
         config = build_config(api_client, redis_client, config_file)
         ctx = Context()
         migrate_connectors(config)
-        if 'organizationId' in config_file['options']:
-            ctx.organizationId = config_file['options']['organizationId']
         migrate_organizations(config, ctx)
 
 
