@@ -1,0 +1,7 @@
+[COSMOSDB]
+url =
+key =
+database =
+[REDIS]
+url:
+scope:

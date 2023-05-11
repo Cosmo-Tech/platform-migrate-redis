@@ -8,6 +8,7 @@ cosmotech-api = ">=2.0.0"
 pyyaml = "*"
 azure-identity = "*"
 azure-graphrbac = "*"
+azure-cosmos = "*"
 
 [dev-packages]
 
