@@ -68,10 +68,10 @@ def convert_to_millis(date_string):
 
 def update(api_client, item):
     i = item['id']
-    if i.startswith("o"):
+    if i.lower().startswith("o"):
         api = organization_api.OrganizationApi(api_client)
         api.import_organization(item)
-    elif i.startswith("sr"):
+    elif i.lower().startswith("sr"):
         api = scenariorun_api.ScenariorunApi(api_client)
         api.import_scenario_run(
             item["organizationId"],
@@ -79,27 +79,27 @@ def update(api_client, item):
             item["scenarioId"],
             item
         )
-    elif i.startswith("sol"):
+    elif i.lower().startswith("sol"):
         api = solution_api.SolutionApi(api_client)
         api.import_solution(
             item["organizationId"],
             item)
-    elif i.startswith("d"):
+    elif i.lower().startswith("d"):
         api = dataset_api.DatasetApi(api_client)
         api.import_dataset(
             item["organizationId"],
             item
         )
-    elif i.startswith("w"):
+    elif i.lower().startswith("w"):
         api = workspace_api.WorkspaceApi(api_client)
         api.import_workspace(
             item["organizationId"],
             item
         )
-    elif i.startswith("c"):
+    elif i.lower().startswith("c"):
         api = connector_api.ConnectorApi(api_client)
         api.import_connector(item)
-    elif i.startswith("s"):
+    elif i.lower().startswith("s"):
         api = scenario_api.ScenarioApi(api_client)
         api.import_scenario(
             item["organizationId"],
@@ -182,5 +182,5 @@ if __name__ == "__main__":
     if not output_folder_exists:
         os.makedirs(output_folder)
 
-    get_cosmosdb(config)
-    # put_cosmosdb_to_redis(config)
+    # get_cosmosdb(config)
+    put_cosmosdb_to_redis(config)
