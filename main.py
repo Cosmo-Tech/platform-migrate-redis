@@ -1,13 +1,11 @@
-# Copyright (c) Cosmo Tech.
-# Licensed under the MIT license.l
-import logging
-import sys
-from dataclasses import dataclass
-from datetime import datetime
+#!/bin/python3
 
-import cosmotech_api
-import yaml
-from azure.identity import DefaultAzureCredential
+import logging
+import os
+import sys
+
+from azure.cosmos import CosmosClient
+from datetime import datetime
 from cosmotech_api import ApiClient
 from cosmotech_api import Configuration
 from cosmotech_api.api import connector_api
@@ -17,224 +15,47 @@ from cosmotech_api.api import organization_api
 from cosmotech_api.api import scenario_api
 from cosmotech_api.api import scenariorun_api
 from cosmotech_api.api import workspace_api
+import json
+from azure.identity import DefaultAzureCredential
 
-logger = logging.getLogger()
-fileHandler = logging.FileHandler("application.log")
-streamHandler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-streamHandler.setFormatter(formatter)
-fileHandler.setFormatter(formatter)
-logger.addHandler(streamHandler)
-logger.addHandler(fileHandler)
-logger.setLevel(logging.DEBUG)
-TRACE_DOCUMENTS = False
+COSMOSDB_URL = "COSMOSDB_URL"
+COSMOSDB_KEY = "COSMOSDB_KEY"
+COSMOSDB_DATABASE_NAME = "COSMOSDB_DATABASE_NAME"
+REDIS_API_URL = "REDIS_API_URL"
+REDIS_API_SCOPE = "REDIS_API_SCOPE"
 
-
-def get_apiclient(config_file):
-    host = config_file['cosmosdb']['url']
-    scope = config_file['cosmosdb']['scope']
-
-    logger.debug("cosmos logging in")
-    credential = DefaultAzureCredential()
-    logger.debug("cosmos Getting token")
-    token = credential.get_token(scope)
-
-    configuration = Configuration(host=host,
-                                  discard_unknown_keys=True,
-                                  access_token=token.token)
-    return ApiClient(configuration)
+env_var_required = [COSMOSDB_URL, COSMOSDB_KEY , COSMOSDB_DATABASE_NAME, REDIS_API_URL, REDIS_API_SCOPE]
+missing_env_vars = []
+output_folder = '/tmp/out'
 
 
-def get_redisclient(config_file):
-    host = config_file['redis']['url']
-    scope = config_file['redis']['scope']
-
-    logger.debug("redis logging in")
-    credential = DefaultAzureCredential()
-    logger.debug("redis Getting token")
-    token = credential.get_token(scope)
-
-    configuration = Configuration(host=host,
-                                  discard_unknown_keys=True,
-                                  access_token=token.token)
-    return ApiClient(configuration)
+def normalize_id(i):
+    if "_" in i:
+        print(f"normalizing {i}")
+        i = i.replace("_", "-")
+    return i.lower()
 
 
-def migrate_connectors(config):
-    logger.info("Migrating connectors")
-    try:
-        redis_connector = connector_api.ConnectorApi(config.redis_client)
-        api_connector = connector_api.ConnectorApi(config.api_client)
-
-        connectors = api_connector.find_all_connectors()
-        logger.info("Found " + f"{len(connectors)}" + " connectors")
-        for connector in connectors:
-            redis_connector.import_connector(connector)
-            logger.info("Migrated connector " + f"{connector.id}")
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when migrating connectors " + f"{e}")
-
-
-def migrate_organizations(config, ctx):
-    logger.info("Migrating organizations")
-    try:
-        redis_organization = organization_api.OrganizationApi(config.redis_client)
-        api_organization = organization_api.OrganizationApi(config.api_client)
-
-        if hasattr(ctx, 'organizationId'):
-            organizations = [api_organization.find_organization_by_id(ctx.organizationId)]
-        else:
-            organizations = api_organization.find_all_organizations()
-        logger.info("Found " + f"{len(organizations)}" + " organizations")
-        for organization in organizations:
-            redis_organization.import_organization(organization)
-            ctx.organizationId = organization.id
-            logger.info("Migrated organization " + f"{organization.id}")
-            migrate_solutions(config, ctx)
-            migrate_datasets(config, ctx)
-            migrate_workspaces(config, ctx)
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when migrating organizations " + f"{e}")
-
-
-def migrate_solutions(config, ctx):
-    logger.info("Migrating solutions for organization " + f"{ctx.organizationId}")
-    try:
-        redis_solution = solution_api.SolutionApi(config.redis_client)
-        api_solution = solution_api.SolutionApi(config.api_client)
-
-        try:
-            solutions = api_solution.find_all_solutions(ctx.organizationId)
-        except cosmotech_api.ApiException:
-            logger.warning("Failed to fetch solutions for organization " + f"{ctx.organizationId}")
-            return
-
-        logger.info("Found " + f"{len(solutions)}" + " solutions")
-        for solution in solutions:
-            solution.organizationId = ctx.organizationId
-            redis_solution.import_solution(ctx.organizationId, solution)
-            logger.info("Migrated solution " + f"{solution.id}")
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when migrating solutions " + f"{e}")
-
-
-def migrate_datasets(config, ctx):
-    logger.info("Migrating datasets for organization " + f"{ctx.organizationId}")
-    try:
-        redis_dataset = dataset_api.DatasetApi(config.redis_client)
-        api_dataset = dataset_api.DatasetApi(config.api_client)
-
-        try:
-            datasets = api_dataset.find_all_datasets(ctx.organizationId)
-        except cosmotech_api.ApiException:
-            logger.warning("Failed to fetch datasets for organization " + f"{ctx.organizationId}")
-            return
-
-        logger.info("Found " + f"{len(datasets)}" + " datasets")
-        for dataset in datasets:
-            dataset.organizationId = ctx.organizationId
-            if dataset.connector is None:
-                logger.warning("Skipping dataset without connector: " + f"{dataset.id}")
-                continue
-            redis_dataset.import_dataset(ctx.organizationId, dataset)
-            logger.info("Migrated dataset " + f"{dataset.id}")
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when migrating datasets " + f"{e}" + f"{dataset}")
-
-
-def migrate_workspaces(config, ctx):
-    logger.info("Migrating workspaces for organization " + f"{ctx.organizationId}")
-    try:
-        redis_workspace = workspace_api.WorkspaceApi(config.redis_client)
-        api_workspace = workspace_api.WorkspaceApi(config.api_client)
-
-        try:
-            workspaces = api_workspace.find_all_workspaces(ctx.organizationId)
-        except cosmotech_api.ApiException:
-            logger.warning("Failed to fetch workspaces for organization " + f"{ctx.organizationId}")
-            return
-
-        logger.info("Found " + f"{len(workspaces)}" + " workspaces")
-        for workspace in workspaces:
-            workspace.organizationId = ctx.organizationId
-            if workspace.solution is None:
-                logger.warning("Skipping workspace without solution: " + f"{workspace.id}")
-                continue
-            redis_workspace.import_workspace(
-                ctx.organizationId,
-                workspace)
-            ctx.workspaceId = workspace.id
-            logger.info("Migrated workspace " + f"{workspace.id}")
-            migrate_scenarios(config, ctx)
-
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when calling " +
-                     "workspace_api->find_all_workspaces: " + f"{e}")
-
-
-def migrate_scenarios(config, ctx):
-    logger.info(
-        "Migrating scenarios for organization:" + f"{ctx.organizationId}" + ", workspace " + f"{ctx.workspaceId}")
-    try:
-        redis_scenario = scenario_api.ScenarioApi(config.redis_client)
-        api_scenario = scenario_api.ScenarioApi(config.api_client)
-
-        try:
-            scenarios = api_scenario.find_all_scenarios(ctx.organizationId,
-                                                        ctx.workspaceId)
-        except cosmotech_api.ApiException:
-            logger.warning(
-                "Failed to fetch scenarios for organization:" + f"{ctx.organizationId}" +
-                ", workspace " + f"{ctx.workspaceId}")
-            return
-
-        logger.info("Found " + f"{len(scenarios)}" + " scenarios")
-        for scenario in scenarios:
-            scenario.organizationId = ctx.organizationId
-            scenario.workspaceId = ctx.workspaceId
-            scenario.creation_date = convert_to_millis(scenario["creation_date"])
-            scenario.last_update = convert_to_millis(scenario["last_update"])
-            scenario = redis_scenario.import_scenario(
-                ctx.organizationId,
-                ctx.workspaceId,
-                scenario)
-            ctx.scenarioId = scenario.id
-            logger.info("Migrated scenario " + f"{scenario.id}")
-            migrate_scenarioruns(config, ctx)
-
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when migrating scenarios: " + f"{e}")
-
-
-def migrate_scenarioruns(config, ctx):
-    logger.info(
-        "Migrating scenarioruns for organization:" + f"{ctx.organizationId}" + ", workspace " + f"{ctx.workspaceId}" + ", scenario " + f"{ctx.scenarioId}")
-    try:
-        redis_scenariorun = scenariorun_api.ScenariorunApi(config.redis_client)
-        api_scenariorun = scenariorun_api.ScenariorunApi(config.api_client)
-
-        try:
-            scenarioruns = api_scenariorun.get_scenario_runs(ctx.organizationId,
-                                                             ctx.workspaceId,
-                                                             ctx.scenarioId)
-        except cosmotech_api.ApiException:
-            logger.warning(
-                "Failed to fetch scenarioruns for organization:" + f"{ctx.organizationId}" +
-                ", workspace " + f"{ctx.workspaceId}" + ", scenario " + f"{ctx.scenarioId}")
-            return
-
-        logger.info("Found " + f"{len(scenarioruns)}" + " scenarioruns")
-        for scenariorun in scenarioruns:
-            scenariorun.organizationId = ctx.organizationId
-            scenariorun.workspaceId = ctx.workspaceId
-            redis_scenariorun.import_scenario_run(
-                ctx.organizationId,
-                ctx.workspaceId,
-                ctx.scenarioId,
-                scenariorun)
-            logger.info("Migrated scenariorun " + f"{scenariorun.id}")
-    except cosmotech_api.ApiException as e:
-        logger.error("Exception when migrating scenarioruns: " + f"{e}")
+def infer_type(i):
+    i = normalize_id(i)
+    if i.startswith("o"):
+        return "Organization"
+    elif i.startswith("sr"):
+        return "Scenariorun"
+    elif i.startswith("sol"):
+        return "Solution"
+    elif i.startswith("u"):
+        return "User"
+    elif i.startswith("d"):
+        return "Dataset"
+    elif i.startswith("w"):
+        return "Workspace"
+    elif i.startswith("c"):
+        return "Connector"
+    elif i.startswith("s"):
+        return "Scenario"
+    else:
+        return "Unknown"
 
 
 def convert_to_millis(date_string):
@@ -247,47 +68,141 @@ def convert_to_millis(date_string):
     return int(round(datetime.timestamp(date) * 1000))
 
 
-def get_config():
-    with open('config.yaml', 'r') as config_file:
-        return yaml.safe_load(config_file)
+def update(api_client, item):
+    i = item['id']
+    if i.lower().startswith("o"):
+        api = organization_api.OrganizationApi(api_client)
+        api.import_organization(item)
+    elif i.lower().startswith("sr"):
+        api = scenariorun_api.ScenariorunApi(api_client)
+        api.import_scenario_run(
+            item["organizationId"],
+            item["workspaceId"],
+            item["scenarioId"],
+            item
+        )
+    elif i.lower().startswith("sol"):
+        api = solution_api.SolutionApi(api_client)
+        api.import_solution(
+            item["organizationId"],
+            item)
+    elif i.lower().startswith("d"):
+        api = dataset_api.DatasetApi(api_client)
+        api.import_dataset(
+            item["organizationId"],
+            item
+        )
+    elif i.lower().startswith("w"):
+        api = workspace_api.WorkspaceApi(api_client)
+        api.import_workspace(
+            item["organizationId"],
+            item
+        )
+    elif i.lower().startswith("c"):
+        api = connector_api.ConnectorApi(api_client)
+        api.import_connector(item)
+    elif i.lower().startswith("s"):
+        api = scenario_api.ScenarioApi(api_client)
+        api.import_scenario(
+            item["organizationId"],
+            item["workspaceId"],
+            item)
+    else:
+        return "Unknown"
 
 
-def build_config(api_client, redis_client, config_file):
-    mapping = {}
-    if 'mapping' not in config_file:
-        config_file['mapping'] = {}
-    if config_file['mapping'] is not None:
-        mapping = config_file['mapping']
-    return Config(api_client=api_client,
-                  redis_client=redis_client,
-                  config_file=config_file,
-                  mapping=mapping)
+def item_clean(_i) -> (str, dict):
+    if 'type' in _i:
+        t = _i.pop('type')
+    else:
+        t = infer_type(_i['id'])
+
+    i = _i.copy()
+    for k in _i.keys():
+        if k.startswith("_"):
+            i.pop(k)
+    return (t, i)
 
 
-def migrate():
-    logging.info("Migration start")
-    config_file = get_config()
+def get_cosmosdb():
+    client = CosmosClient(cosmosdb_url, cosmosdb_key, logging_enable=True)
 
-    with get_apiclient(config_file) as api_client, get_redisclient(config_file) as redis_client:
-        config = build_config(api_client, redis_client, config_file)
-        ctx = Context()
-        migrate_connectors(config)
-        migrate_organizations(config, ctx)
+    p_client = client.get_database_client(cosmosdb_database_name)
+    for container in p_client.list_containers():
+        organization_id = container['id'].split("_")[0]
+        c_client = p_client.get_container_client(container['id'])
+        for i in c_client.read_all_items():
+            item_type, item = item_clean(i)
+            if organization_id != 'connectors' and organization_id != 'users':
+                item['organizationId'] = organization_id
+            if 'creationDate' in item:
+                item["creationDate"] = convert_to_millis(item["creationDate"])
+            if 'lastUpdate' in item:
+                item["lastUpdate"] = convert_to_millis(item["lastUpdate"])
+            if 'ioTypes' in item:
+                item["io_types"] = item["ioTypes"]
+                del item["ioTypes"]
+            if 'compatibility' in item and item['compatibility'] is not None:
+                for compta in item['compatibility']:
+                    if 'solutionKey' in compta:
+                        compta["solution_key"] = compta["solutionKey"]
+                        del compta["solutionKey"]
+            logger.info("Item %s of type %s", item['id'], item_type)
+
+            with open(f"{output_folder}/{item_type}_{item['id']}.json", "w") as file:
+                file.write(json.dumps(item, indent=4))
 
 
-@dataclass
-class Config(object):
-    api_client: str
-    redis_client: str
-    config_file: str
-    mapping: dict
+def get_redis_api():
+    credential = DefaultAzureCredential()
+    token = credential.get_token(redis_api_scope)
+    configuration = Configuration(host=redis_api_url,
+                                  discard_unknown_keys=True,
+                                  access_token=token.token)
+    return ApiClient(configuration)
 
 
-class Context:
-    organizationId: str
-    workspaceId: str
-    scenarioId: str
+def put_cosmosdb_to_redis():
+    with get_redis_api() as api:
+        for file in os.listdir(output_folder):
+            if file.endswith(".json"):
+                with open(f"{output_folder}/{file}", "r") as file:
+                    item = json.load(file)
+                    logger.info("Migrating Item %s", item['id'])
+                    update(api, item)
+
+
+def check_env_var():
+    """
+    Check if all required environment variables are specified
+    """
+    for env_var in env_var_required:
+        if env_var not in os.environ:
+            missing_env_vars.append(env_var)
 
 
 if __name__ == "__main__":
-    migrate()
+
+    log_level_name = os.getenv("LOG_LEVEL") if "LOG_LEVEL" in os.environ else "INFO"
+    log_level = logging.getLevelName(log_level_name)
+    logging.basicConfig(stream=sys.stdout, level=log_level,
+                        format='%(levelname)s(%(name)s) - %(asctime)s - %(message)s',
+                        datefmt='%d-%m-%y %H:%M:%S')
+    logger = logging.getLogger(__name__)
+
+    check_env_var()
+    if not missing_env_vars:
+        cosmosdb_url = os.getenv(COSMOSDB_URL)
+        cosmosdb_key = os.getenv(COSMOSDB_KEY)
+        cosmosdb_database_name = os.getenv(COSMOSDB_DATABASE_NAME)
+        redis_api_url = os.getenv(REDIS_API_URL)
+        redis_api_scope = os.getenv(REDIS_API_SCOPE)
+    else:
+        raise Exception(f"Missing environment variables named {missing_env_vars}")
+
+    output_folder_exists = os.path.exists(output_folder)
+    if not output_folder_exists:
+        os.makedirs(output_folder)
+
+    get_cosmosdb()
+    put_cosmosdb_to_redis()

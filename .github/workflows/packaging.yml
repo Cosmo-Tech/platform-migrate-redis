@@ -1,0 +1,63 @@
+name: Packaging
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+env:
+  IMAGE_NAME: platform-migrate-redis
+
+jobs:
+
+  push_container_images_to_registries:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v2.3.4
+
+      - name: Build image
+        run: docker build . --file Dockerfile --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
+
+      - name: Scan Container Image
+        id: scan
+        # TODO For now, do not block if the container scan action returns issues
+        continue-on-error: true
+        uses: Azure/container-scan@v0.1
+        with:
+          image-name: ${{ env.IMAGE_NAME }}
+
+      - name: Archive container image scan report
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v2
+        with:
+          name: container-image-scan-report
+          path: ${{ steps.scan.outputs.scan-report-path }}
+          retention-days: 3
+
+      - name: Log into registry
+        # This is where you will update the PAT to GITHUB_TOKEN
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push image
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+
+          # Change all uppercase to lowercase
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          # Use Docker `latest` tag convention
+          [ "$VERSION" == "main" ] && VERSION=latest
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
