@@ -21,9 +21,9 @@ COSMOSDB_URL = "COSMOSDB_URL"
 COSMOSDB_KEY = "COSMOSDB_KEY"
 COSMOSDB_DATABASE_NAME = "COSMOSDB_DATABASE_NAME"
 REDIS_API_URL = "REDIS_API_URL"
-REDIS_TOKEN = "REDIS_TOKEN"
+REDIS_API_TOKEN = "REDIS_API_TOKEN"
 
-env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_API_URL, REDIS_TOKEN]
+env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_API_URL, REDIS_API_TOKEN]
 missing_env_vars = []
 output_folder = '/tmp/out'
 
@@ -155,7 +155,7 @@ def get_cosmosdb():
 def get_redis_api():
     configuration = Configuration(host=redis_api_url,
                                   discard_unknown_keys=True,
-                                  access_token=redis_token)
+                                  access_token=redis_api_token)
     return ApiClient(configuration)
 
 
@@ -193,7 +193,7 @@ if __name__ == "__main__":
         cosmosdb_key = os.getenv(COSMOSDB_KEY)
         cosmosdb_database_name = os.getenv(COSMOSDB_DATABASE_NAME)
         redis_api_url = os.getenv(REDIS_API_URL)
-        redis_token = os.getenv(REDIS_TOKEN)
+        redis_api_token = os.getenv(REDIS_API_TOKEN)
     else:
         raise Exception(f"Missing environment variables named {missing_env_vars}")
 
