@@ -122,13 +122,6 @@ def get_cosmosdb():
                 file.write(json.dumps(item, indent=4))
 
 
-def get_redis_api():
-    configuration = Configuration(host=redis_api_url,
-                                  discard_unknown_keys=True,
-                                  access_token=redis_api_token)
-    return ApiClient(configuration)
-
-
 def get_redis():
     pool = redis.ConnectionPool(host='localhost', port=6379, password=redis_password)
     r = redis.Redis(connection_pool=pool)
