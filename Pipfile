@@ -4,9 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-cosmotech-api = ">=2.0.0"
 pyyaml = "*"
 azure-cosmos = "*"
+redis = "4.5.5"
 
 [dev-packages]
 

@@ -4,26 +4,19 @@ import logging
 import os
 import sys
 
+import redis as redis
 from azure.cosmos import CosmosClient
 from datetime import datetime
 from cosmotech_api import ApiClient
 from cosmotech_api import Configuration
-from cosmotech_api.api import connector_api
-from cosmotech_api.api import solution_api
-from cosmotech_api.api import dataset_api
-from cosmotech_api.api import organization_api
-from cosmotech_api.api import scenario_api
-from cosmotech_api.api import scenariorun_api
-from cosmotech_api.api import workspace_api
 import json
 
 COSMOSDB_URL = "COSMOSDB_URL"
 COSMOSDB_KEY = "COSMOSDB_KEY"
 COSMOSDB_DATABASE_NAME = "COSMOSDB_DATABASE_NAME"
-REDIS_API_URL = "REDIS_API_URL"
-REDIS_API_TOKEN = "REDIS_API_TOKEN"
+REDIS_PASSWORD = "REDIS_PASSWORD"
 
-env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_API_URL, REDIS_API_TOKEN]
+env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_PASSWORD]
 missing_env_vars = []
 output_folder = '/tmp/out'
 
@@ -67,45 +60,22 @@ def convert_to_millis(date_string):
     return int(round(datetime.timestamp(date) * 1000))
 
 
-def update(api_client, item):
+def update(redis, item):
     i = item['id']
     if i.lower().startswith("o"):
-        api = organization_api.OrganizationApi(api_client)
-        api.import_organization(item)
+        redis.json().set(f"com.cosmotech.organization.domain.Organization:{i}", '$', item)
     elif i.lower().startswith("sr"):
-        api = scenariorun_api.ScenariorunApi(api_client)
-        api.import_scenario_run(
-            item["organizationId"],
-            item["workspaceId"],
-            item["scenarioId"],
-            item
-        )
+        redis.json().set(f"com.cosmotech.scenariorun.domain.ScenarioRun:{i}", '$', item)
     elif i.lower().startswith("sol"):
-        api = solution_api.SolutionApi(api_client)
-        api.import_solution(
-            item["organizationId"],
-            item)
+        redis.json().set(f"com.cosmotech.solution.domain.Solution:{i}", '$', item)
     elif i.lower().startswith("d"):
-        api = dataset_api.DatasetApi(api_client)
-        api.import_dataset(
-            item["organizationId"],
-            item
-        )
+        redis.json().set(f"com.cosmotech.dataset.domain.Dataset:{i}", '$', item)
     elif i.lower().startswith("w"):
-        api = workspace_api.WorkspaceApi(api_client)
-        api.import_workspace(
-            item["organizationId"],
-            item
-        )
-    elif i.lower().startswith("c"):
-        api = connector_api.ConnectorApi(api_client)
-        api.import_connector(item)
+        redis.json().set(f"com.cosmotech.workspace.domain.Workspace:{i}", '$', item)
+    if i.lower().startswith("c"):
+        redis.json().set(f"com.cosmotech.connector.domain.Connector:{i}", '$', item)
     elif i.lower().startswith("s"):
-        api = scenario_api.ScenarioApi(api_client)
-        api.import_scenario(
-            item["organizationId"],
-            item["workspaceId"],
-            item)
+        redis.json().set(f"com.cosmotech.scenario.domain.Scenario:{i}", '$', item)
     else:
         return "Unknown"
 
@@ -159,14 +129,20 @@ def get_redis_api():
     return ApiClient(configuration)
 
 
+def get_redis():
+    pool = redis.ConnectionPool(host='localhost', port=6379, password=redis_password)
+    r = redis.Redis(connection_pool=pool)
+    return r
+
+
 def put_cosmosdb_to_redis():
-    with get_redis_api() as api:
-        for file in os.listdir(output_folder):
-            if file.endswith(".json"):
-                with open(f"{output_folder}/{file}", "r") as file:
-                    item = json.load(file)
-                    logger.info("Migrating Item %s", item['id'])
-                    update(api, item)
+    api = get_redis()
+    for file in os.listdir(output_folder):
+        if file.endswith(".json"):
+            with open(f"{output_folder}/{file}", "r") as file:
+                item = json.load(file)
+                logger.info("Migrating Item %s", item['id'])
+                update(api, item)
 
 
 def check_env_var():
@@ -192,8 +168,7 @@ if __name__ == "__main__":
         cosmosdb_url = os.getenv(COSMOSDB_URL)
         cosmosdb_key = os.getenv(COSMOSDB_KEY)
         cosmosdb_database_name = os.getenv(COSMOSDB_DATABASE_NAME)
-        redis_api_url = os.getenv(REDIS_API_URL)
-        redis_api_token = os.getenv(REDIS_API_TOKEN)
+        redis_password = os.getenv(REDIS_PASSWORD)
     else:
         raise Exception(f"Missing environment variables named {missing_env_vars}")
 
