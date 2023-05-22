@@ -14,9 +14,10 @@ import json
 COSMOSDB_URL = "COSMOSDB_URL"
 COSMOSDB_KEY = "COSMOSDB_KEY"
 COSMOSDB_DATABASE_NAME = "COSMOSDB_DATABASE_NAME"
+REDIS_SERVER = "REDIS_SERVER"
 REDIS_PASSWORD = "REDIS_PASSWORD"
 
-env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_PASSWORD]
+env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_SERVER, REDIS_PASSWORD]
 missing_env_vars = []
 output_folder = '/tmp/out'
 
@@ -123,7 +124,7 @@ def get_cosmosdb():
 
 
 def get_redis():
-    pool = redis.ConnectionPool(host='localhost', port=6379, password=redis_password)
+    pool = redis.ConnectionPool(host=redis_server, port=6379, password=redis_password)
     r = redis.Redis(connection_pool=pool)
     return r
 
@@ -161,6 +162,7 @@ if __name__ == "__main__":
         cosmosdb_url = os.getenv(COSMOSDB_URL)
         cosmosdb_key = os.getenv(COSMOSDB_KEY)
         cosmosdb_database_name = os.getenv(COSMOSDB_DATABASE_NAME)
+        redis_server = os.getenv(REDIS_SERVER)
         redis_password = os.getenv(REDIS_PASSWORD)
     else:
         raise Exception(f"Missing environment variables named {missing_env_vars}")
