@@ -73,7 +73,7 @@ def update(redis, item):
         redis.json().set(f"com.cosmotech.dataset.domain.Dataset:{i}", '$', item)
     elif i.lower().startswith("w"):
         redis.json().set(f"com.cosmotech.workspace.domain.Workspace:{i}", '$', item)
-    if i.lower().startswith("c"):
+    elif i.lower().startswith("c"):
         redis.json().set(f"com.cosmotech.connector.domain.Connector:{i}", '$', item)
     elif i.lower().startswith("s"):
         redis.json().set(f"com.cosmotech.scenario.domain.Scenario:{i}", '$', item)
