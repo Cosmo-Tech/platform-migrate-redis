@@ -16,6 +16,15 @@ COSMOSDB_KEY = "COSMOSDB_KEY"
 COSMOSDB_DATABASE_NAME = "COSMOSDB_DATABASE_NAME"
 REDIS_SERVER = "REDIS_SERVER"
 REDIS_PASSWORD = "REDIS_PASSWORD"
+INDEXES_LIST = [
+    "FT.DROPINDEX com.cosmotech.dataset.domain.DatasetIdx",
+    "FT.DROPINDEX com.cosmotech.workspace.domain.WorkspaceIdx",
+    "FT.DROPINDEX com.cosmotech.scenariorun.domain.ScenarioRunIdx",
+    "FT.DROPINDEX com.cosmotech.solution.domain.SolutionIdx",
+    "FT.DROPINDEX com.cosmotech.organization.domain.OrganizationIdx",
+    "FT.DROPINDEX com.cosmotech.connector.domain.ConnectorIdx",
+    "FT.DROPINDEX com.cosmotech.scenario.domain.ScenarioIdx"
+]
 
 env_var_required = [COSMOSDB_URL, COSMOSDB_KEY, COSMOSDB_DATABASE_NAME, REDIS_SERVER, REDIS_PASSWORD]
 missing_env_vars = []
@@ -139,6 +148,15 @@ def put_cosmosdb_to_redis():
                 update(api, item)
 
 
+def delete_redis_index():
+    # Migration step creates indexes that is causing the
+    # Cosmo Tech API to crash. We remove them so the API can
+    # create them at launch.
+    api = get_redis()
+    for index in INDEXES_LIST:
+        api.ft(index).dropindex()
+
+
 def check_env_var():
     """
     Check if all required environment variables are specified
@@ -173,3 +191,4 @@ if __name__ == "__main__":
 
     get_cosmosdb()
     put_cosmosdb_to_redis()
+    delete_redis_index()
